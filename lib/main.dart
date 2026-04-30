@@ -110,6 +110,49 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
     flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
   }
 
+  void _confirmDelete(Birthday b) {
+    final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sahkan Padam'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Masukkan kata laluan untuk memadam rekod ${b.name}:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: passwordController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Kata Laluan',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              if (passwordController.text == "219") {
+                _db.doc(b.id).delete();
+                flutterLocalNotificationsPlugin.cancel(b.hashCode);
+                Navigator.pop(context);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Kata laluan salah!"), backgroundColor: Colors.red),
+                );
+              }
+            },
+            child: const Text('Padam'),
+          ),
+        ],
+      ),
+    );
+  }
+
   int _daysUntilNextBirthday(DateTime birthday) {
     DateTime now = DateTime.now();
     DateTime today = DateTime(now.year, now.month, now.day);
@@ -145,7 +188,6 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.monthDay,
     );
   }
 
@@ -359,10 +401,10 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
                 child: ListTile(
                   title: Text(b.name, style: TextStyle(fontWeight: FontWeight.bold, color: daysLeft == 0 ? Colors.white : Colors.black87)),
                   subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${daysLeft == 0 ? 'HARI INI!' : '$daysLeft hari lagi'}", style: TextStyle(color: daysLeft == 0 ? Colors.white70 : Colors.black54)),
-                  trailing: IconButton(icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), onPressed: () {
-                    _db.doc(b.id).delete();
-                    flutterLocalNotificationsPlugin.cancel(b.hashCode);
-                  }),
+                  trailing: IconButton(
+                    icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), 
+                    onPressed: () => _confirmDelete(b),
+                  ),
                 ),
               );
             },
