@@ -199,9 +199,26 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Tambah Rekod', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    // Hanya tunjuk butang scan jika bukan web
-                    if (!kIsWeb)
-                      IconButton(icon: const Icon(Icons.document_scanner, color: Colors.blue), onPressed: () { Navigator.pop(context); _scanBulkImage(); }),
+                    // Butang scan kini muncul di semua platform
+                    IconButton(
+                      icon: Icon(
+                        Icons.document_scanner, 
+                        color: kIsWeb ? Colors.grey : Colors.blue
+                      ), 
+                      onPressed: () { 
+                        if (kIsWeb) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Fungsi imbasan AI hanya tersedia di aplikasi Android. Sila imbas menggunakan telefon, data akan muncul di sini secara automatik!"),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        } else {
+                          Navigator.pop(context); 
+                          _scanBulkImage(); 
+                        }
+                      }
+                    ),
                   ],
                 ),
                 TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nama Penuh')),
