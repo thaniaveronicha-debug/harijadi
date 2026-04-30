@@ -10,9 +10,23 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Timezone
+  tz.initializeTimeZones();
+  
+  // Initialize Notifications
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
   try {
     if (kIsWeb) {
       await Firebase.initializeApp(
@@ -89,6 +103,11 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
+    _requestPermissions();
+  }
+
+  void _requestPermissions() {
+    flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
   }
 
   int _daysUntilNextBirthday(DateTime birthday) {
@@ -101,11 +120,38 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
     return next.difference(today).inDays;
   }
 
+  Future<void> _scheduleNotification(Birthday bday) async {
+    if (kIsWeb) return;
+
+    DateTime now = DateTime.now();
+    DateTime next = DateTime(now.year, bday.date.month, bday.date.day, 8, 0); // Pukul 8 Pagi
+    if (next.isBefore(now)) {
+      next = DateTime(now.year + 1, bday.date.month, bday.date.day, 8, 0);
+    }
+
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      bday.hashCode,
+      '🎂 Hari Jadi Hari Ini!',
+      'Jangan lupa ucapkan selamat hari jadi kepada ${bday.name}!',
+      tz.TZDateTime.from(next, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'birthday_channel',
+          'Peringatan Hari Jadi',
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.monthDay,
+    );
+  }
+
   Future<void> _scanBulkImage() async {
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Imbasan AI hanya di aplikasi telefon.")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Imbasan AI hanya di telefon.")));
       return;
     }
 
@@ -152,26 +198,19 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
             }
           }
         }
-        if (name.length > 3) {
-          detected.add(Birthday(name: name, date: bday, phoneNumber: ""));
-        }
+        if (name.length > 3) detected.add(Birthday(name: name, date: bday, phoneNumber: ""));
       }
     }
     textRecognizer.close();
 
     if (detected.isNotEmpty) {
-      // Tapis duplikasi dalam senarai yang baru dikesan
       final uniqueDetected = detected.toSet().toList();
-      
-      // Ambil data sedia ada dari DB untuk perbandingan
       final existingDocs = await _db.get();
       final existingBirthdays = existingDocs.docs.map((doc) => Birthday.fromFirestore(doc)).toList();
-
-      // Hanya simpan yang BELUM wujud dalam DB
       final toAdd = uniqueDetected.where((d) => !existingBirthdays.contains(d)).toList();
 
       if (toAdd.isEmpty) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Semua rekod sudah wujud dalam sistem.")));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Semua rekod sudah wujud.")));
       } else {
         _confirmDetectedBirthdays(toAdd);
       }
@@ -198,7 +237,10 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           ElevatedButton(
             onPressed: () {
-              for (var b in detected) { _db.add(b.toJson()); }
+              for (var b in detected) { 
+                _db.add(b.toJson()); 
+                _scheduleNotification(b);
+              }
               Navigator.pop(context);
             },
             child: const Text('Tambah Semua'),
@@ -231,7 +273,7 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
                       icon: Icon(Icons.document_scanner, color: kIsWeb ? Colors.grey : Colors.blue), 
                       onPressed: () {
                         if (kIsWeb) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Imbasan AI di aplikasi telefon.")));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Imbasan AI di telefon.")));
                         } else {
                           Navigator.pop(context); _scanBulkImage();
                         }
@@ -252,15 +294,11 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
                   onPressed: () async {
                     if (nameController.text.isNotEmpty) {
                       final newBday = Birthday(name: nameController.text, date: selectedDate, phoneNumber: phoneController.text);
-                      
-                      // Cek duplikasi manual
-                      final existing = await _db
-                          .where('name', isEqualTo: newBday.name)
-                          .where('date', isEqualTo: newBday.date.toIso8601String())
-                          .get();
+                      final existing = await _db.where('name', isEqualTo: newBday.name).where('date', isEqualTo: newBday.date.toIso8601String()).get();
 
                       if (existing.docs.isEmpty) {
                         _db.add(newBday.toJson());
+                        _scheduleNotification(newBday);
                         if (mounted) Navigator.pop(context);
                       } else {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Rekod ini sudah wujud!"), backgroundColor: Colors.red));
@@ -289,7 +327,7 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
             icon: Icon(Icons.refresh, color: _isRefreshing ? Colors.grey : Colors.blue),
             onPressed: () async {
               setState(() => _isRefreshing = true);
-              await Future.delayed(const Duration(seconds: 1)); // Simulasi refresh
+              await Future.delayed(const Duration(seconds: 1));
               setState(() => _isRefreshing = false);
             },
           ),
@@ -301,9 +339,10 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           
           List<Birthday> birthdays = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList();
-          
-          // Susun: Hari jadi paling hampir berada di ATAS
           birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date)));
+
+          // Sync notifications when data is loaded
+          for (var b in birthdays) { _scheduleNotification(b); }
 
           if (birthdays.isEmpty) return const Center(child: Text('Kosong. Klik + untuk tambah.'));
 
@@ -320,7 +359,10 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
                 child: ListTile(
                   title: Text(b.name, style: TextStyle(fontWeight: FontWeight.bold, color: daysLeft == 0 ? Colors.white : Colors.black87)),
                   subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${daysLeft == 0 ? 'HARI INI!' : '$daysLeft hari lagi'}", style: TextStyle(color: daysLeft == 0 ? Colors.white70 : Colors.black54)),
-                  trailing: IconButton(icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), onPressed: () => _db.doc(b.id).delete()),
+                  trailing: IconButton(icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), onPressed: () {
+                    _db.doc(b.id).delete();
+                    flutterLocalNotificationsPlugin.cancel(b.hashCode);
+                  }),
                 ),
               );
             },
