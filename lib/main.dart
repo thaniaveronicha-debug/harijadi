@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart'; // Tambah ini untuk kIsWeb
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,8 +13,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Konfigurasi Firebase untuk Android dan Web
   try {
     if (kIsWeb) {
       await Firebase.initializeApp(
@@ -34,7 +32,6 @@ void main() async {
   } catch (e) {
     print("Firebase init error: $e");
   }
-  
   runApp(const BirthdayApp());
 }
 
@@ -61,6 +58,19 @@ class Birthday {
       phoneNumber: data['phoneNumber'] ?? "",
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Birthday &&
+          runtimeType == other.runtimeType &&
+          name.toLowerCase() == other.name.toLowerCase() &&
+          date.day == other.date.day &&
+          date.month == other.date.month &&
+          date.year == other.date.year;
+
+  @override
+  int get hashCode => name.toLowerCase().hashCode ^ date.hashCode;
 }
 
 class BirthdayListScreen extends StatefulWidget {
@@ -73,8 +83,7 @@ class BirthdayListScreen extends StatefulWidget {
 class _BirthdayListScreenState extends State<BirthdayListScreen> {
   final CollectionReference _db = FirebaseFirestore.instance.collection('birthdays');
   late stt.SpeechToText _speech;
-  bool _isListening = false;
-  String _activeField = "";
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -84,18 +93,18 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
 
   int _daysUntilNextBirthday(DateTime birthday) {
     DateTime now = DateTime.now();
+    DateTime today = DateTime(now.year, now.month, now.day);
     DateTime next = DateTime(now.year, birthday.month, birthday.day);
-    if (next.isBefore(DateTime(now.year, now.month, now.day))) {
+    if (next.isBefore(today)) {
       next = DateTime(now.year + 1, birthday.month, birthday.day);
     }
-    return next.difference(DateTime(now.year, now.month, now.day)).inDays;
+    return next.difference(today).inDays;
   }
 
   Future<void> _scanBulkImage() async {
-    // Fungsi ini hanya aktif di Mobile (Android/iOS)
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Maaf, fungsi imbasan gambar AI hanya tersedia di aplikasi telefon (Android).")),
+        const SnackBar(content: Text("Imbasan AI hanya di aplikasi telefon.")),
       );
       return;
     }
@@ -143,18 +152,37 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
             }
           }
         }
-        if (name.length > 3) detected.add(Birthday(name: name, date: bday, phoneNumber: ""));
+        if (name.length > 3) {
+          detected.add(Birthday(name: name, date: bday, phoneNumber: ""));
+        }
       }
     }
     textRecognizer.close();
-    if (detected.isNotEmpty) _confirmDetectedBirthdays(detected);
+
+    if (detected.isNotEmpty) {
+      // Tapis duplikasi dalam senarai yang baru dikesan
+      final uniqueDetected = detected.toSet().toList();
+      
+      // Ambil data sedia ada dari DB untuk perbandingan
+      final existingDocs = await _db.get();
+      final existingBirthdays = existingDocs.docs.map((doc) => Birthday.fromFirestore(doc)).toList();
+
+      // Hanya simpan yang BELUM wujud dalam DB
+      final toAdd = uniqueDetected.where((d) => !existingBirthdays.contains(d)).toList();
+
+      if (toAdd.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Semua rekod sudah wujud dalam sistem.")));
+      } else {
+        _confirmDetectedBirthdays(toAdd);
+      }
+    }
   }
 
   void _confirmDetectedBirthdays(List<Birthday> detected) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Dijumpai ${detected.length} Rekod'),
+        title: Text('Dijumpai ${detected.length} Rekod Baru'),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.builder(
@@ -199,23 +227,13 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Tambah Rekod', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    // Butang scan kini muncul di semua platform
                     IconButton(
-                      icon: Icon(
-                        Icons.document_scanner, 
-                        color: kIsWeb ? Colors.grey : Colors.blue
-                      ), 
-                      onPressed: () { 
+                      icon: Icon(Icons.document_scanner, color: kIsWeb ? Colors.grey : Colors.blue), 
+                      onPressed: () {
                         if (kIsWeb) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Fungsi imbasan AI hanya tersedia di aplikasi Android. Sila imbas menggunakan telefon, data akan muncul di sini secara automatik!"),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Imbasan AI di aplikasi telefon.")));
                         } else {
-                          Navigator.pop(context); 
-                          _scanBulkImage(); 
+                          Navigator.pop(context); _scanBulkImage();
                         }
                       }
                     ),
@@ -231,10 +249,22 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
                   },
                 ),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (nameController.text.isNotEmpty) {
-                      _db.add(Birthday(name: nameController.text, date: selectedDate, phoneNumber: phoneController.text).toJson());
-                      Navigator.pop(context);
+                      final newBday = Birthday(name: nameController.text, date: selectedDate, phoneNumber: phoneController.text);
+                      
+                      // Cek duplikasi manual
+                      final existing = await _db
+                          .where('name', isEqualTo: newBday.name)
+                          .where('date', isEqualTo: newBday.date.toIso8601String())
+                          .get();
+
+                      if (existing.docs.isEmpty) {
+                        _db.add(newBday.toJson());
+                        if (mounted) Navigator.pop(context);
+                      } else {
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Rekod ini sudah wujud!"), backgroundColor: Colors.red));
+                      }
                     }
                   },
                   child: const Text('Simpan'),
@@ -251,13 +281,28 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('🎂 Peringatan AI (Cloud)'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('🎂 Peringatan AI'), 
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh, color: _isRefreshing ? Colors.grey : Colors.blue),
+            onPressed: () async {
+              setState(() => _isRefreshing = true);
+              await Future.delayed(const Duration(seconds: 1)); // Simulasi refresh
+              setState(() => _isRefreshing = false);
+            },
+          ),
+        ],
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _db.snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           
           List<Birthday> birthdays = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList();
+          
+          // Susun: Hari jadi paling hampir berada di ATAS
           birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date)));
 
           if (birthdays.isEmpty) return const Center(child: Text('Kosong. Klik + untuk tambah.'));
