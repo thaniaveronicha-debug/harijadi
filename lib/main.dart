@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart'; // Tambah ini untuk kIsWeb
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,34 +8,43 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Konfigurasi Firebase untuk Android dan Web
+  try {
+    if (kIsWeb) {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: "AIzaSyBR4rCkl8-zBsbGGw4XlxefcQCALj_Fwe0",
+          authDomain: "birthday-cfe.firebaseapp.com",
+          projectId: "birthday-cfe",
+          storageBucket: "birthday-cfe.firebasestorage.app",
+          messagingSenderId: "811132241802",
+          appId: "1:811132241802:web:250b79ece8c528d5206a73",
+          measurementId: "G-0TPLD9SGKD",
+        ),
+      );
+    } else {
+      await Firebase.initializeApp();
+    }
+  } catch (e) {
+    print("Firebase init error: $e");
+  }
+  
   runApp(const BirthdayApp());
 }
 
-class BirthdayApp extends StatelessWidget {
-  const BirthdayApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Peringatan Harijadi AI',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
-        useMaterial3: true,
-      ),
-      home: const BirthdayListScreen(),
-    );
-  }
-}
-
 class Birthday {
+  String id;
   final String name;
   final DateTime date;
   final String phoneNumber;
 
-  Birthday({required this.name, required this.date, required this.phoneNumber});
+  Birthday({this.id = "", required this.name, required this.date, required this.phoneNumber});
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -42,11 +52,15 @@ class Birthday {
         'phoneNumber': phoneNumber,
       };
 
-  factory Birthday.fromJson(Map<String, dynamic> json) => Birthday(
-        name: json['name'],
-        date: DateTime.parse(json['date']),
-        phoneNumber: json['phoneNumber'] ?? "",
-      );
+  factory Birthday.fromFirestore(DocumentSnapshot doc) {
+    Map data = doc.data() as Map;
+    return Birthday(
+      id: doc.id,
+      name: data['name'] ?? "",
+      date: DateTime.parse(data['date']),
+      phoneNumber: data['phoneNumber'] ?? "",
+    );
+  }
 }
 
 class BirthdayListScreen extends StatefulWidget {
@@ -57,7 +71,7 @@ class BirthdayListScreen extends StatefulWidget {
 }
 
 class _BirthdayListScreenState extends State<BirthdayListScreen> {
-  List<Birthday> _birthdays = [];
+  final CollectionReference _db = FirebaseFirestore.instance.collection('birthdays');
   late stt.SpeechToText _speech;
   bool _isListening = false;
   String _activeField = "";
@@ -66,37 +80,6 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
-    _loadBirthdays();
-  }
-
-  Future<void> _loadBirthdays() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? birthdaysJson = prefs.getString('birthdays');
-    if (birthdaysJson != null) {
-      final List<dynamic> decodedList = jsonDecode(birthdaysJson);
-      setState(() {
-        _birthdays = decodedList.map((item) => Birthday.fromJson(item)).toList();
-        _sortBirthdays();
-      });
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkTodayBirthdays());
-  }
-
-  Future<void> _saveBirthdays() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('birthdays', jsonEncode(_birthdays.map((b) => b.toJson()).toList()));
-  }
-
-  void _sortBirthdays() {
-    _birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date)));
-  }
-
-  void _addBirthday(String name, DateTime date, String phone) {
-    setState(() {
-      _birthdays.add(Birthday(name: name, date: date, phoneNumber: phone));
-      _sortBirthdays();
-    });
-    _saveBirthdays();
   }
 
   int _daysUntilNextBirthday(DateTime birthday) {
@@ -108,30 +91,15 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
     return next.difference(DateTime(now.year, now.month, now.day)).inDays;
   }
 
-  void _checkTodayBirthdays() {
-    DateTime now = DateTime.now();
-    for (var bday in _birthdays) {
-      if (bday.date.day == now.day && bday.date.month == now.month) {
-        _showReminderDialog(bday);
-      }
+  Future<void> _scanBulkImage() async {
+    // Fungsi ini hanya aktif di Mobile (Android/iOS)
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Maaf, fungsi imbasan gambar AI hanya tersedia di aplikasi telefon (Android).")),
+      );
+      return;
     }
-  }
 
-  void _showReminderDialog(Birthday bday) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🎂 Harijadi Hari Ini!'),
-        content: Text('Selamat Harijadi kepada ${bday.name}!'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup')),
-        ],
-      ),
-    );
-  }
-
-  // FUNGSI AI: IMBAS GAMBAR
-  Future<void> _scanImage(Function(String, DateTime) onDataExtracted) async {
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
@@ -140,29 +108,76 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
     
-    String extractedName = "";
-    DateTime extractedDate = DateTime.now();
+    List<Birthday> detected = [];
+    RegExp icReg = RegExp(r'(\d{6})[-\s]?\d{2}[-\s]?\d{4}');
 
-    // Logik ringkas AI untuk mencari tarikh & nama dalam teks
+    List<Map<String, dynamic>> allLines = [];
     for (TextBlock block in recognizedText.blocks) {
       for (TextLine line in block.lines) {
-        String text = line.text;
-        // Cari tarikh (Format: DD/MM/YYYY atau DD-MM-YYYY)
-        RegExp dateReg = RegExp(r'(\d{1,2})[\/\- ](\d{1,2})[\/\- ](\d{2,4})');
-        if (dateReg.hasMatch(text)) {
-          var match = dateReg.firstMatch(text);
-          int day = int.parse(match!.group(1)!);
-          int month = int.parse(match.group(2)!);
-          int year = int.parse(match.group(3)!);
-          if (year < 100) year += 2000;
-          try { extractedDate = DateTime(year, month, day); } catch (e) {}
-        } else if (extractedName.isEmpty && text.length > 3) {
-          extractedName = text; // Anggap baris teks pertama yang panjang sebagai nama
+        allLines.add({'text': line.text.trim(), 'y': line.boundingBox.top, 'x': line.boundingBox.left});
+      }
+    }
+
+    for (var lineData in allLines) {
+      String text = lineData['text'];
+      if (icReg.hasMatch(text)) {
+        var match = icReg.firstMatch(text);
+        String icNum = match!.group(0)!;
+        String dobPart = match.group(1)!;
+
+        int year = int.parse(dobPart.substring(0, 2));
+        int month = int.parse(dobPart.substring(2, 4));
+        int day = int.parse(dobPart.substring(4, 6));
+        year += (year > (DateTime.now().year % 100)) ? 1900 : 2000;
+        DateTime bday = DateTime(year, month, day);
+
+        String name = text.split(icNum)[0].trim().replaceFirst(RegExp(r'^\d+\s*'), '');
+        if (name.length < 3) {
+          for (var other in allLines) {
+            if (other['text'] != text && (other['y'] - lineData['y']).abs() < 15 && other['x'] < lineData['x']) {
+              String t = other['text'];
+              if (t.length > 3 && !t.contains(RegExp(r'\d{6}'))) {
+                name = t.replaceFirst(RegExp(r'^\d+\s*'), '');
+                break;
+              }
+            }
+          }
         }
+        if (name.length > 3) detected.add(Birthday(name: name, date: bday, phoneNumber: ""));
       }
     }
     textRecognizer.close();
-    onDataExtracted(extractedName, extractedDate);
+    if (detected.isNotEmpty) _confirmDetectedBirthdays(detected);
+  }
+
+  void _confirmDetectedBirthdays(List<Birthday> detected) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Dijumpai ${detected.length} Rekod'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: detected.length,
+            itemBuilder: (context, i) => ListTile(
+              title: Text(detected[i].name),
+              subtitle: Text(DateFormat('dd/MM/yyyy').format(detected[i].date)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              for (var b in detected) { _db.add(b.toJson()); }
+              Navigator.pop(context);
+            },
+            child: const Text('Tambah Semua'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAddBirthdaySheet() {
@@ -173,125 +188,92 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            
-            void toggleListen(String field) async {
-              bool available = await _speech.initialize();
-              if (available) {
-                setModalState(() { _isListening = true; _activeField = field; });
-                _speech.listen(onResult: (val) => setModalState(() {
-                  if (field == "name") nameController.text = val.recognizedWords;
-                  if (field == "phone") phoneController.text = val.recognizedWords.replaceAll(RegExp(r'[^0-9]'), '');
-                }));
-              }
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 10),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 10),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(Icons.drag_handle, color: Colors.grey),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Tambah Rekod AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        IconButton(
-                          icon: const Icon(Icons.document_scanner, color: Colors.blue),
-                          onPressed: () => _scanImage((name, date) {
-                            setModalState(() {
-                              nameController.text = name;
-                              selectedDate = date;
-                            });
-                          }),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    TextField(
-                      controller: nameController, 
-                      decoration: InputDecoration(
-                        labelText: 'Nama', 
-                        suffixIcon: IconButton(icon: Icon(_isListening && _activeField=="name" ? Icons.mic : Icons.mic_none), onPressed: () => toggleListen("name"))
-                      )
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: phoneController, 
-                      decoration: InputDecoration(
-                        labelText: 'WhatsApp', 
-                        suffixIcon: IconButton(icon: Icon(_isListening && _activeField=="phone" ? Icons.mic : Icons.mic_none), onPressed: () => toggleListen("phone"))
-                      )
-                    ),
-                    const SizedBox(height: 15),
-                    ListTile(
-                      title: Text("Tarikh: ${DateFormat('dd MMMM yyyy').format(selectedDate)}"),
-                      trailing: const Icon(Icons.calendar_month),
-                      onTap: () async {
-                        final p = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(1900), lastDate: DateTime.now());
-                        if (p != null) setModalState(() => selectedDate = p);
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                      onPressed: () {
-                        if (nameController.text.isNotEmpty) {
-                          _addBirthday(nameController.text, selectedDate, phoneController.text);
-                          Navigator.pop(context);
-                        }
-                      },
-                      child: const Text('Simpan Rekod'),
-                    ),
-                    const SizedBox(height: 30),
+                    const Text('Tambah Rekod', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    // Hanya tunjuk butang scan jika bukan web
+                    if (!kIsWeb)
+                      IconButton(icon: const Icon(Icons.document_scanner, color: Colors.blue), onPressed: () { Navigator.pop(context); _scanBulkImage(); }),
                   ],
                 ),
-              ),
-            );
-          },
-        );
-      },
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nama Penuh')),
+                TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'WhatsApp')),
+                ListTile(
+                  title: Text("Tarikh: ${DateFormat('dd/MM/yyyy').format(selectedDate)}"),
+                  onTap: () async {
+                    final p = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(1900), lastDate: DateTime.now());
+                    if (p != null) setModalState(() => selectedDate = p);
+                  },
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (nameController.text.isNotEmpty) {
+                      _db.add(Birthday(name: nameController.text, date: selectedDate, phoneNumber: phoneController.text).toJson());
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Simpan'),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('🎂 Peringatan AI'),
-        backgroundColor: Colors.pink[50],
-        centerTitle: true,
+      appBar: AppBar(title: const Text('🎂 Peringatan AI (Cloud)'), centerTitle: true),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _db.snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          
+          List<Birthday> birthdays = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList();
+          birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date)));
+
+          if (birthdays.isEmpty) return const Center(child: Text('Kosong. Klik + untuk tambah.'));
+
+          return ListView.builder(
+            itemCount: birthdays.length,
+            itemBuilder: (context, index) {
+              final b = birthdays[index];
+              final daysLeft = _daysUntilNextBirthday(b.date);
+              Color cardColor = daysLeft == 0 ? Colors.pinkAccent : (daysLeft <= 7 ? Colors.orange[100]! : (daysLeft <= 30 ? Colors.yellow[50]! : Colors.white));
+
+              return Card(
+                color: cardColor,
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: ListTile(
+                  title: Text(b.name, style: TextStyle(fontWeight: FontWeight.bold, color: daysLeft == 0 ? Colors.white : Colors.black87)),
+                  subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${daysLeft == 0 ? 'HARI INI!' : '$daysLeft hari lagi'}", style: TextStyle(color: daysLeft == 0 ? Colors.white70 : Colors.black54)),
+                  trailing: IconButton(icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), onPressed: () => _db.doc(b.id).delete()),
+                ),
+              );
+            },
+          );
+        },
       ),
-      body: _birthdays.isEmpty
-          ? const Center(child: Text('Kosong. Guna AI untuk imbas gambar!'))
-          : ListView.builder(
-              itemCount: _birthdays.length,
-              itemBuilder: (context, index) {
-                final b = _birthdays[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: ListTile(
-                    leading: CircleAvatar(child: Text(b.name[0])),
-                    title: Text(b.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${_daysUntilNextBirthday(b.date)} hari lagi"),
-                    trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => setState(() => _birthdays.removeAt(index))),
-                  ),
-                );
-              },
-            ),
       floatingActionButton: FloatingActionButton(onPressed: _showAddBirthdaySheet, child: const Icon(Icons.add)),
     );
   }
+}
 
-  int _calculateAge(DateTime bday) {
-    DateTime now = DateTime.now();
-    int age = now.year - bday.year;
-    if (now.month < bday.month || (now.month == bday.month && now.day < bday.day)) age--;
-    return age;
+class BirthdayApp extends StatelessWidget {
+  const BirthdayApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(debugShowCheckedModeBanner: false, theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent), useMaterial3: true), home: const BirthdayListScreen());
   }
 }
