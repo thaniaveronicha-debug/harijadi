@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 void main() {
   runApp(const BirthdayApp());
@@ -15,12 +18,11 @@ class BirthdayApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Peringatan Harijadi',
+      title: 'Peringatan Harijadi AI',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
         useMaterial3: true,
-        brightness: Brightness.light,
       ),
       home: const BirthdayListScreen(),
     );
@@ -58,7 +60,7 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
   List<Birthday> _birthdays = [];
   late stt.SpeechToText _speech;
   bool _isListening = false;
-  String _activeField = ""; // "name", "phone", "date"
+  String _activeField = "";
 
   @override
   void initState() {
@@ -77,23 +79,16 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
         _sortBirthdays();
       });
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkTodayBirthdays();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkTodayBirthdays());
   }
 
   Future<void> _saveBirthdays() async {
     final prefs = await SharedPreferences.getInstance();
-    final String encodedList = jsonEncode(_birthdays.map((b) => b.toJson()).toList());
-    await prefs.setString('birthdays', encodedList);
+    await prefs.setString('birthdays', jsonEncode(_birthdays.map((b) => b.toJson()).toList()));
   }
 
   void _sortBirthdays() {
-    _birthdays.sort((a, b) {
-      int aNext = _daysUntilNextBirthday(a.date);
-      int bNext = _daysUntilNextBirthday(b.date);
-      return aNext.compareTo(bNext);
-    });
+    _birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date)));
   }
 
   void _addBirthday(String name, DateTime date, String phone) {
@@ -102,58 +97,6 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
       _sortBirthdays();
     });
     _saveBirthdays();
-    _checkTodayBirthdays();
-  }
-
-  void _deleteBirthday(int index) {
-    setState(() {
-      _birthdays.removeAt(index);
-    });
-    _saveBirthdays();
-  }
-
-  void _checkTodayBirthdays() {
-    DateTime now = DateTime.now();
-    List<Birthday> todayBirthdays = _birthdays.where((b) {
-      return b.date.day == now.day && b.date.month == now.month;
-    }).toList();
-
-    if (todayBirthdays.isNotEmpty) {
-      for (var bday in todayBirthdays) {
-        _showReminderDialog(bday);
-      }
-    }
-  }
-
-  Future<void> _sendWhatsApp(Birthday bday) async {
-    if (bday.phoneNumber.isEmpty) return;
-    String phone = bday.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    if (!phone.startsWith('6')) phone = '6$phone';
-    final message = "Selamat Hari Jadi, ${bday.name}! 🎉";
-    final url = Uri.parse("https://wa.me/$phone/?text=${Uri.encodeComponent(message)}");
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  void _showReminderDialog(Birthday bday) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🎂 Peringatan Harijadi!'),
-        content: Text('Hari ini adalah harijadi ${bday.name}!'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-          if (bday.phoneNumber.isNotEmpty)
-            ElevatedButton.icon(
-              onPressed: () { Navigator.pop(context); _sendWhatsApp(bday); },
-              icon: const Icon(Icons.message),
-              label: const Text('WhatsApp'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-            ),
-        ],
-      ),
-    );
   }
 
   int _daysUntilNextBirthday(DateTime birthday) {
@@ -163,6 +106,63 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
       next = DateTime(now.year + 1, birthday.month, birthday.day);
     }
     return next.difference(DateTime(now.year, now.month, now.day)).inDays;
+  }
+
+  void _checkTodayBirthdays() {
+    DateTime now = DateTime.now();
+    for (var bday in _birthdays) {
+      if (bday.date.day == now.day && bday.date.month == now.month) {
+        _showReminderDialog(bday);
+      }
+    }
+  }
+
+  void _showReminderDialog(Birthday bday) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🎂 Harijadi Hari Ini!'),
+        content: Text('Selamat Harijadi kepada ${bday.name}!'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup')),
+        ],
+      ),
+    );
+  }
+
+  // FUNGSI AI: IMBAS GAMBAR
+  Future<void> _scanImage(Function(String, DateTime) onDataExtracted) async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+
+    final inputImage = InputImage.fromFilePath(image.path);
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+    
+    String extractedName = "";
+    DateTime extractedDate = DateTime.now();
+
+    // Logik ringkas AI untuk mencari tarikh & nama dalam teks
+    for (TextBlock block in recognizedText.blocks) {
+      for (TextLine line in block.lines) {
+        String text = line.text;
+        // Cari tarikh (Format: DD/MM/YYYY atau DD-MM-YYYY)
+        RegExp dateReg = RegExp(r'(\d{1,2})[\/\- ](\d{1,2})[\/\- ](\d{2,4})');
+        if (dateReg.hasMatch(text)) {
+          var match = dateReg.firstMatch(text);
+          int day = int.parse(match!.group(1)!);
+          int month = int.parse(match.group(2)!);
+          int year = int.parse(match.group(3)!);
+          if (year < 100) year += 2000;
+          try { extractedDate = DateTime(year, month, day); } catch (e) {}
+        } else if (extractedName.isEmpty && text.length > 3) {
+          extractedName = text; // Anggap baris teks pertama yang panjang sebagai nama
+        }
+      }
+    }
+    textRecognizer.close();
+    onDataExtracted(extractedName, extractedDate);
   }
 
   void _showAddBirthdaySheet() {
@@ -178,122 +178,68 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             
-            void onSpeechResult(String words) {
-              setModalState(() {
-                if (_activeField == "name") {
-                  nameController.text = words;
-                } else if (_activeField == "phone") {
-                  phoneController.text = words.replaceAll(RegExp(r'[^0-9]'), '');
-                } else if (_activeField == "date") {
-                  // Logik ringkas mengecam bulan melalui suara
-                  final lowerWords = words.toLowerCase();
-                  int month = selectedDate.month;
-                  if (lowerWords.contains("januari")) month = 1;
-                  else if (lowerWords.contains("februari")) month = 2;
-                  else if (lowerWords.contains("mac")) month = 3;
-                  else if (lowerWords.contains("april")) month = 4;
-                  else if (lowerWords.contains("mei")) month = 5;
-                  else if (lowerWords.contains("jun")) month = 6;
-                  else if (lowerWords.contains("julai")) month = 7;
-                  else if (lowerWords.contains("ogos")) month = 8;
-                  else if (lowerWords.contains("september")) month = 9;
-                  else if (lowerWords.contains("oktober")) month = 10;
-                  else if (lowerWords.contains("november")) month = 11;
-                  else if (lowerWords.contains("disember")) month = 12;
-
-                  // Cuba cari nombor (hari & tahun)
-                  final RegExp numReg = RegExp(r'\d+');
-                  final matches = numReg.allMatches(words).toList();
-                  int day = selectedDate.day;
-                  int year = selectedDate.year;
-
-                  if (matches.isNotEmpty) day = int.parse(matches[0].group(0)!);
-                  if (matches.length > 1) year = int.parse(matches[matches.length - 1].group(0)!);
-
-                  try {
-                    selectedDate = DateTime(year > 100 ? year : 2000 + year, month, day);
-                  } catch (e) { /* ignore parse errors */ }
-                }
-              });
-            }
-
             void toggleListen(String field) async {
-              if (_isListening && _activeField == field) {
-                setModalState(() => _isListening = false);
-                _speech.stop();
-              } else {
-                bool available = await _speech.initialize();
-                if (available) {
-                  setModalState(() {
-                    _isListening = true;
-                    _activeField = field;
-                  });
-                  _speech.listen(onResult: (val) => onSpeechResult(val.recognizedWords));
-                }
+              bool available = await _speech.initialize();
+              if (available) {
+                setModalState(() { _isListening = true; _activeField = field; });
+                _speech.listen(onResult: (val) => setModalState(() {
+                  if (field == "name") nameController.text = val.recognizedWords;
+                  if (field == "phone") phoneController.text = val.recognizedWords.replaceAll(RegExp(r'[^0-9]'), '');
+                }));
               }
             }
 
-            Widget micButton(String field) {
-              bool active = _isListening && _activeField == field;
-              return GestureDetector(
-                onTap: () => toggleListen(field),
-                child: CircleAvatar(
-                  radius: 20,
-                  backgroundColor: active ? Colors.red : Colors.pinkAccent,
-                  child: Icon(active ? Icons.mic : Icons.mic_none, color: Colors.white, size: 20),
-                ),
-              );
-            }
-
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 10),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Tambah Rekod Baru', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    // INPUT NAMA
+                    const Icon(Icons.drag_handle, color: Colors.grey),
+                    const SizedBox(height: 10),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(child: TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nama', prefixIcon: Icon(Icons.person)))),
-                        const SizedBox(width: 8),
-                        micButton("name"),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    // INPUT TELEFON
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Nombor Telefon', prefixIcon: Icon(Icons.phone)))),
-                        const SizedBox(width: 8),
-                        micButton("phone"),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    // INPUT TARIKH
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () async {
-                              final p = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(1900), lastDate: DateTime.now());
-                              if (p != null) setModalState(() => selectedDate = p);
-                            },
-                            child: InputDecorator(
-                              decoration: const InputDecoration(labelText: 'Tarikh Harijadi', prefixIcon: Icon(Icons.calendar_today)),
-                              child: Text(DateFormat('dd MMMM yyyy').format(selectedDate)),
-                            ),
-                          ),
+                        const Text('Tambah Rekod AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        IconButton(
+                          icon: const Icon(Icons.document_scanner, color: Colors.blue),
+                          onPressed: () => _scanImage((name, date) {
+                            setModalState(() {
+                              nameController.text = name;
+                              selectedDate = date;
+                            });
+                          }),
                         ),
-                        const SizedBox(width: 8),
-                        micButton("date"),
                       ],
                     ),
-                    const SizedBox(height: 25),
+                    const SizedBox(height: 15),
+                    TextField(
+                      controller: nameController, 
+                      decoration: InputDecoration(
+                        labelText: 'Nama', 
+                        suffixIcon: IconButton(icon: Icon(_isListening && _activeField=="name" ? Icons.mic : Icons.mic_none), onPressed: () => toggleListen("name"))
+                      )
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: phoneController, 
+                      decoration: InputDecoration(
+                        labelText: 'WhatsApp', 
+                        suffixIcon: IconButton(icon: Icon(_isListening && _activeField=="phone" ? Icons.mic : Icons.mic_none), onPressed: () => toggleListen("phone"))
+                      )
+                    ),
+                    const SizedBox(height: 15),
+                    ListTile(
+                      title: Text("Tarikh: ${DateFormat('dd MMMM yyyy').format(selectedDate)}"),
+                      trailing: const Icon(Icons.calendar_month),
+                      onTap: () async {
+                        final p = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(1900), lastDate: DateTime.now());
+                        if (p != null) setModalState(() => selectedDate = p);
+                      },
+                    ),
+                    const SizedBox(height: 20),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15)),
+                      style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
                       onPressed: () {
                         if (nameController.text.isNotEmpty) {
                           _addBirthday(nameController.text, selectedDate, phoneController.text);
@@ -317,31 +263,23 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🎂 Peringatan Harijadi', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        title: const Text('🎂 Peringatan AI'),
+        backgroundColor: Colors.pink[50],
         centerTitle: true,
       ),
       body: _birthdays.isEmpty
-          ? const Center(child: Text('Tiada rekod. Tekan + untuk tambah!'))
+          ? const Center(child: Text('Kosong. Guna AI untuk imbas gambar!'))
           : ListView.builder(
-              padding: const EdgeInsets.all(12),
               itemCount: _birthdays.length,
               itemBuilder: (context, index) {
                 final b = _birthdays[index];
-                final isToday = _daysUntilNextBirthday(b.date) == 0;
                 return Card(
-                  color: isToday ? Colors.pink[50] : null,
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   child: ListTile(
-                    leading: CircleAvatar(backgroundColor: isToday ? Colors.pinkAccent : Colors.pink[100], child: Icon(isToday ? Icons.cake : Icons.favorite, color: Colors.white)),
+                    leading: CircleAvatar(child: Text(b.name[0])),
                     title: Text(b.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text("${DateFormat('dd MMMM').format(b.date)} • ${_calculateAge(b.date)} tahun"),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (b.phoneNumber.isNotEmpty) IconButton(icon: const Icon(Icons.message, color: Colors.green), onPressed: () => _sendWhatsApp(b)),
-                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _deleteBirthday(index)),
-                      ],
-                    ),
+                    subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${_daysUntilNextBirthday(b.date)} hari lagi"),
+                    trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => setState(() => _birthdays.removeAt(index))),
                   ),
                 );
               },
