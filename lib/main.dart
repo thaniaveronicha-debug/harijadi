@@ -152,6 +152,15 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
     return next.difference(today).inDays;
   }
 
+  int _calculateAge(DateTime birthDate) {
+    DateTime now = DateTime.now();
+    int age = now.year - birthDate.year;
+    if (now.month < birthDate.month || (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
   Future<void> _scheduleNotification(Birthday bday) async {
     if (kIsWeb) return;
     DateTime now = DateTime.now();
@@ -246,7 +255,7 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('🎂 Peringatan AI'), centerTitle: true, actions: [IconButton(icon: Icon(Icons.refresh, color: _isRefreshing ? Colors.grey : Colors.blue), onPressed: () async { setState(() => _isRefreshing = true); await Future.delayed(const Duration(seconds: 1)); setState(() => _isRefreshing = false); })]),
-      body: StreamBuilder<QuerySnapshot>(stream: _db.snapshots(), builder: (context, snapshot) { if (!snapshot.hasData) return const Center(child: CircularProgressIndicator()); List<Birthday> birthdays = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList(); birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date))); for (var b in birthdays) { _scheduleNotification(b); } if (birthdays.isEmpty) return const Center(child: Text('Kosong. Klik + untuk tambah.')); return ListView.builder(itemCount: birthdays.length, itemBuilder: (context, index) { final b = birthdays[index]; final daysLeft = _daysUntilNextBirthday(b.date); Color cardColor = daysLeft == 0 ? Colors.pinkAccent : (daysLeft <= 7 ? Colors.orange[100]! : (daysLeft <= 30 ? Colors.yellow[50]! : Colors.white)); return Card(color: cardColor, margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(title: Text(b.name, style: TextStyle(fontWeight: FontWeight.bold, color: daysLeft == 0 ? Colors.white : Colors.black87)), subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${daysLeft == 0 ? 'HARI INI!' : '$daysLeft hari lagi'}", style: TextStyle(color: daysLeft == 0 ? Colors.white70 : Colors.black54)), trailing: IconButton(icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), onPressed: () => _confirmDelete(b)))); }); }),
+      body: StreamBuilder<QuerySnapshot>(stream: _db.snapshots(), builder: (context, snapshot) { if (!snapshot.hasData) return const Center(child: CircularProgressIndicator()); List<Birthday> birthdays = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList(); birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date))); for (var b in birthdays) { _scheduleNotification(b); } if (birthdays.isEmpty) return const Center(child: Text('Kosong. Klik + untuk tambah.')); return ListView.builder(itemCount: birthdays.length, itemBuilder: (context, index) { final b = birthdays[index]; final daysLeft = _daysUntilNextBirthday(b.date); Color cardColor = daysLeft == 0 ? Colors.pinkAccent : (daysLeft <= 7 ? Colors.orange[100]! : (daysLeft <= 30 ? Colors.yellow[50]! : Colors.white)); return Card(color: cardColor, margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(title: Text(b.name, style: TextStyle(fontWeight: FontWeight.bold, color: daysLeft == 0 ? Colors.white : Colors.black87)), subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${_calculateAge(b.date)} thn • ${daysLeft == 0 ? 'HARI INI!' : '$daysLeft hari lagi'}", style: TextStyle(color: daysLeft == 0 ? Colors.white70 : Colors.black54)), trailing: IconButton(icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), onPressed: () => _confirmDelete(b)))); }); }),
       floatingActionButton: FloatingActionButton(onPressed: _showAddBirthdaySheet, child: const Icon(Icons.add)),
     );
   }
