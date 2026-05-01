@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -161,6 +162,47 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
     return age;
   }
 
+  String _generateGreeting(Birthday b) {
+    int age = _calculateAge(b.date);
+    DateTime now = DateTime.now();
+    DateTime bdayThisYear = DateTime(now.year, b.date.month, b.date.day);
+    if (bdayThisYear.isBefore(DateTime(now.year, now.month, now.day))) {
+      bdayThisYear = DateTime(now.year + 1, b.date.month, b.date.day);
+    }
+    
+    // Format: 07Mac2026 Sabtu
+    Map<String, String> days = {'Monday': 'Isnin', 'Tuesday': 'Selasa', 'Wednesday': 'Rabu', 'Thursday': 'Khamis', 'Friday': 'Jumaat', 'Saturday': 'Sabtu', 'Sunday': 'Ahad'};
+    Map<String, String> months = {'Jan': 'Jan', 'Feb': 'Feb', 'Mar': 'Mac', 'Apr': 'Apr', 'May': 'Mei', 'Jun': 'Jun', 'Jul': 'Jul', 'Aug': 'Ogos', 'Sep': 'Sept', 'Oct': 'Okt', 'Nov': 'Nov', 'Dec': 'Dis'};
+    
+    String dayName = days[DateFormat('EEEE').format(bdayThisYear)] ?? DateFormat('EEEE').format(bdayThisYear);
+    String monthName = months[DateFormat('MMM').format(bdayThisYear)] ?? DateFormat('MMM').format(bdayThisYear);
+    String formattedDate = "${bdayThisYear.day}$monthName${bdayThisYear.year} $dayName";
+
+    return """🌟。🤩。😉。🍀
+  。🎁 。🎉 。🌟
+ ✨。＼｜／。🌺
+
+SANNAH HELWAH 
+
+Selamat Hari Lahir 
+${b.name}✨
+ke-$age
+$formattedDate
+
+
+
+👱‍♂️ Semoga dipanjangkan umur
+😂  Ceria Selalu
+🏧  Dimurahkan Rezeki sentiasa
+💪🏼  Diberikan Kesihatan yang berpanjangan
+📿  Ditetapkan Iman
+ 🤲🏻 Berbahagia Dunia Akhirat 
+🕋  Serta mendapat
+        Keberkatan dalam hidup
+
+  °   آمِيّنْ.. آمِيّنْ.. آمِّيْنَ يَا رَبَّ الْعَالَمِيْنَ..""";
+  }
+
   Future<void> _scheduleNotification(Birthday bday) async {
     if (kIsWeb) return;
     DateTime now = DateTime.now();
@@ -168,8 +210,8 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
     if (next.isBefore(now)) next = DateTime(now.year + 1, bday.date.month, bday.date.day, 8, 0);
     await flutterLocalNotificationsPlugin.zonedSchedule(
       bday.hashCode,
-      '🎂 Hari Jadi Hari Ini!',
-      'Jangan lupa ucapkan selamat hari jadi kepada ${bday.name}!',
+      'Hari ini Tarikh Lahir ${bday.name}',
+      'Sentuh untuk jana & salin ucapan!',
       tz.TZDateTime.from(next, tz.local),
       const NotificationDetails(android: AndroidNotificationDetails('birthday_channel', 'Peringatan Hari Jadi', importance: Importance.max, priority: Priority.high, icon: '@mipmap/ic_launcher')),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -254,8 +296,46 @@ class _BirthdayListScreenState extends State<BirthdayListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('🎂 Peringatan AI'), centerTitle: true, actions: [IconButton(icon: Icon(Icons.refresh, color: _isRefreshing ? Colors.grey : Colors.blue), onPressed: () async { setState(() => _isRefreshing = true); await Future.delayed(const Duration(seconds: 1)); setState(() => _isRefreshing = false); })]),
-      body: StreamBuilder<QuerySnapshot>(stream: _db.snapshots(), builder: (context, snapshot) { if (!snapshot.hasData) return const Center(child: CircularProgressIndicator()); List<Birthday> birthdays = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList(); birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date))); for (var b in birthdays) { _scheduleNotification(b); } if (birthdays.isEmpty) return const Center(child: Text('Kosong. Klik + untuk tambah.')); return ListView.builder(itemCount: birthdays.length, itemBuilder: (context, index) { final b = birthdays[index]; final daysLeft = _daysUntilNextBirthday(b.date); Color cardColor = daysLeft == 0 ? Colors.pinkAccent : (daysLeft <= 7 ? Colors.orange[100]! : (daysLeft <= 30 ? Colors.yellow[50]! : Colors.white)); return Card(color: cardColor, margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(title: Text(b.name, style: TextStyle(fontWeight: FontWeight.bold, color: daysLeft == 0 ? Colors.white : Colors.black87)), subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${_calculateAge(b.date)} thn • ${daysLeft == 0 ? 'HARI INI!' : '$daysLeft hari lagi'}", style: TextStyle(color: daysLeft == 0 ? Colors.white70 : Colors.black54)), trailing: IconButton(icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), onPressed: () => _confirmDelete(b)))); }); }),
+      appBar: AppBar(
+        title: const Text('🎂 Peringatan AI'), 
+        centerTitle: true, 
+        actions: [
+          IconButton(
+            tooltip: 'Test Notifikasi 8:20 Malam',
+            icon: const Icon(Icons.alarm, color: Colors.red),
+            onPressed: () async {
+              DateTime now = DateTime.now();
+              final testBday = Birthday(
+                name: "Zek Test", 
+                date: DateTime(1990, now.month, now.day), 
+                phoneNumber: "0123456789"
+              );
+              
+              // Jadualkan khas untuk 8:20 Malam (20:20)
+              DateTime testTime = DateTime(now.year, now.month, now.day, 20, 20);
+              
+              if (testTime.isBefore(now)) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Jam 8:20 PM sudah berlalu hari ini! Cuba jam lain.")));
+                return;
+              }
+
+              await flutterLocalNotificationsPlugin.zonedSchedule(
+                999,
+                'Hari ini Tarikh Lahir ${testBday.name}',
+                'Sentuh untuk jana & salin ucapan!',
+                tz.TZDateTime.from(testTime, tz.local),
+                const NotificationDetails(android: AndroidNotificationDetails('birthday_channel', 'Peringatan Hari Jadi', importance: Importance.max, priority: Priority.high, icon: '@mipmap/ic_launcher')),
+                androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+                uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+              );
+              
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Notifikasi Ujian dijadualkan pada 8:20 PM untuk ${testBday.name}")));
+            },
+          ),
+          IconButton(icon: Icon(Icons.refresh, color: _isRefreshing ? Colors.grey : Colors.blue), onPressed: () async { setState(() => _isRefreshing = true); await Future.delayed(const Duration(seconds: 1)); setState(() => _isRefreshing = false); })
+        ]
+      ),
+      body: StreamBuilder<QuerySnapshot>(stream: _db.snapshots(), builder: (context, snapshot) { if (!snapshot.hasData) return const Center(child: CircularProgressIndicator()); List<Birthday> birthdays = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList(); birthdays.sort((a, b) => _daysUntilNextBirthday(a.date).compareTo(_daysUntilNextBirthday(b.date))); for (var b in birthdays) { _scheduleNotification(b); } if (birthdays.isEmpty) return const Center(child: Text('Kosong. Klik + untuk tambah.')); return ListView.builder(itemCount: birthdays.length, itemBuilder: (context, index) { final b = birthdays[index]; final daysLeft = _daysUntilNextBirthday(b.date); Color cardColor = daysLeft == 0 ? Colors.pinkAccent : (daysLeft <= 7 ? Colors.orange[100]! : (daysLeft <= 30 ? Colors.yellow[50]! : Colors.white)); return Card(color: cardColor, margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(title: Text(b.name, style: TextStyle(fontWeight: FontWeight.bold, color: daysLeft == 0 ? Colors.white : Colors.black87)), subtitle: Text("${DateFormat('dd MMM').format(b.date)} • ${_calculateAge(b.date)} thn • ${daysLeft == 0 ? 'HARI INI!' : '$daysLeft hari lagi'}", style: TextStyle(color: daysLeft == 0 ? Colors.white70 : Colors.black54)), trailing: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: Icon(Icons.copy, color: daysLeft == 0 ? Colors.white : Colors.blue), onPressed: () { Clipboard.setData(ClipboardData(text: _generateGreeting(b))); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Ucapan untuk ${b.name} telah disalin!"))); }), IconButton(icon: Icon(Icons.delete, color: daysLeft == 0 ? Colors.white : Colors.red), onPressed: () => _confirmDelete(b))]))); }); }),
       floatingActionButton: FloatingActionButton(onPressed: _showAddBirthdaySheet, child: const Icon(Icons.add)),
     );
   }
