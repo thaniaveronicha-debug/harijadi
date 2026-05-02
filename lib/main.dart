@@ -84,6 +84,19 @@ class Birthday {
       isBirthday: data['isBirthday'] ?? true,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Birthday &&
+          runtimeType == other.runtimeType &&
+          name.toLowerCase() == other.name.toLowerCase() &&
+          date.day == other.date.day &&
+          date.month == other.date.month &&
+          date.year == other.date.year;
+
+  @override
+  int get hashCode => name.toLowerCase().hashCode ^ date.hashCode;
 }
 
 class BirthdayListScreen extends StatefulWidget {
@@ -181,6 +194,134 @@ $formattedDate
     );
   }
 
+  Future<void> _scanBulkImage() async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Imbasan AI hanya di telefon.")));
+      return;
+    }
+
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+
+    final inputImage = InputImage.fromFilePath(image.path);
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+    
+    List<Birthday> detected = [];
+    RegExp icReg = RegExp(r'(\d{6})[-\s]?\d{2}[-\s]?\d{4}');
+    RegExp dateReg = RegExp(r'(\d{1,2})[\/\-\. ]+(\d{1,2})[\/\-\. ]+(\d{2,4})');
+
+    List<Map<String, dynamic>> allLines = [];
+    for (TextBlock block in recognizedText.blocks) {
+      for (TextLine line in block.lines) {
+        allLines.add({'text': line.text.trim(), 'y': line.boundingBox.top, 'x': line.boundingBox.left});
+      }
+    }
+
+    for (var lineData in allLines) {
+      String text = lineData['text'];
+      DateTime? bday;
+      String name = "";
+
+      if (icReg.hasMatch(text)) {
+        var match = icReg.firstMatch(text);
+        String icNum = match!.group(0)!;
+        String dobPart = match.group(1)!;
+        int year = int.parse(dobPart.substring(0, 2));
+        int month = int.parse(dobPart.substring(2, 4));
+        int day = int.parse(dobPart.substring(4, 6));
+        year += (year > (DateTime.now().year % 100)) ? 1900 : 2000;
+        bday = DateTime(year, month, day, 8, 0);
+        name = text.split(icNum)[0].trim();
+      } else if (dateReg.hasMatch(text)) {
+        var match = dateReg.firstMatch(text);
+        int d = int.parse(match!.group(1)!);
+        int m = int.parse(match.group(2)!);
+        int y = int.parse(match.group(3)!);
+        if (y < 100) y += 2000;
+        try { bday = DateTime(y, m, d, 8, 0); name = text.split(match.group(0)!)[0].trim(); } catch (e) {}
+      }
+
+      if (bday != null) {
+        name = name.replaceFirst(RegExp(r'^\d+\s*'), '').trim();
+        if (name.length > 2) detected.add(Birthday(name: name, date: bday, phoneNumber: "", isBirthday: true));
+      }
+    }
+    textRecognizer.close();
+
+    if (detected.isNotEmpty) {
+      final uniqueDetected = detected.toSet().toList();
+      final existingDocs = await _db.get();
+      final existingBirthdays = existingDocs.docs.map((doc) => Birthday.fromFirestore(doc)).toList();
+      final toAdd = uniqueDetected.where((d) => !existingBirthdays.contains(d)).toList();
+
+      if (toAdd.isNotEmpty) {
+        _confirmDetectedBirthdays(toAdd);
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Semua rekod sudah wujud.")));
+      }
+    }
+  }
+
+  void _confirmDetectedBirthdays(List<Birthday> detected) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Dijumpai ${detected.length} Rekod Baru'),
+        content: SizedBox(width: double.maxFinite, child: ListView.builder(shrinkWrap: true, itemCount: detected.length, itemBuilder: (context, i) => ListTile(title: Text(detected[i].name), subtitle: Text(DateFormat('dd/MM/yyyy').format(detected[i].date))))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')), 
+          ElevatedButton(onPressed: () { 
+            for (var b in detected) { 
+              _db.add(b.toJson()); 
+              _scheduleSmartNotification(b);
+            } 
+            Navigator.pop(context); 
+          }, child: const Text('Tambah Semua'))
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(Birthday b) {
+    final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sahkan Padam'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Masukkan kata laluan untuk memadam rekod ${b.name}:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: passwordController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Kata Laluan'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              if (passwordController.text == "219") {
+                _db.doc(b.id).delete();
+                flutterLocalNotificationsPlugin.cancel(b.hashCode);
+                Navigator.pop(context);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Kata laluan salah!"), backgroundColor: Colors.red));
+              }
+            },
+            child: const Text('Padam'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAddSheet() {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
@@ -213,7 +354,13 @@ $formattedDate
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Tambah Rekod Baru', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    const Text('Tambah Rekod Baru', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: Icon(Icons.document_scanner, color: kIsWeb ? Colors.grey : Colors.blue), 
+                      onPressed: () { if (!kIsWeb) { Navigator.pop(context); _scanBulkImage(); } }
+                    ),
+                  ]),
                   const SizedBox(height: 10),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     ChoiceChip(label: const Text("🎂 Hari Jadi"), selected: isBirthday, onSelected: (s) => setModalState(() => isBirthday = true)),
@@ -280,15 +427,10 @@ $formattedDate
 
   Widget _buildList(bool isBirthdayTab) {
     return StreamBuilder<QuerySnapshot>(
-      // Kita ambil semua data dahulu supaya rekod lama tidak tercicir
       stream: _db.snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        
-        // Tukar data Firestore kepada senarai objek Birthday
         List<Birthday> allItems = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList();
-        
-        // Tapis data: Rekod lama (tanpa field isBirthday) akan masuk ke tab Hari Jadi secara automatik
         List<Birthday> items = allItems.where((item) => item.isBirthday == isBirthdayTab).toList();
         
         if (isBirthdayTab) {
@@ -304,14 +446,21 @@ $formattedDate
           itemBuilder: (context, index) {
             final b = items[index];
             final daysLeft = isBirthdayTab ? _daysUntilNextBirthday(b.date) : b.date.difference(DateTime.now()).inDays;
+            
+            // Calculate age for birthday tab
+            int age = DateTime.now().year - b.date.year;
+            if (DateTime.now().month < b.date.month || (DateTime.now().month == b.date.month && DateTime.now().day < b.date.day)) age--;
+
             return Card(
               color: (isBirthdayTab && daysLeft == 0) ? Colors.pink[50] : Colors.white,
               child: ListTile(
                 title: Text(b.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(isBirthdayTab ? "${DateFormat('dd MMM').format(b.date)} • $daysLeft hari lagi" : "${DateFormat('dd MMM yyyy • HH:mm').format(b.date)}"),
+                subtitle: Text(isBirthdayTab 
+                  ? "${DateFormat('dd MMM').format(b.date)} • $age thn • $daysLeft hari lagi" 
+                  : "${DateFormat('dd MMM yyyy • HH:mm').format(b.date)}"),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                   IconButton(icon: const Icon(Icons.copy, color: Colors.blue), onPressed: () { copyGreetingStatic(b); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ucapan disalin!"))); }),
-                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _db.doc(b.id).delete()),
+                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _confirmDelete(b)),
                 ]),
               ),
             );
