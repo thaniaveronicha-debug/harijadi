@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "811132241802",
+    "project_id": "birthday-cfe",
+    "storage_bucket": "birthday-cfe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:811132241802:android:0f8aadf7db6f4119206a73",
+        "android_client_info": {
+          "package_name": "com.example.birthday"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEGllR3H8z1Nqyin9LNxJCupTlfBe7TqE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
