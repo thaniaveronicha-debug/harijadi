@@ -270,17 +270,17 @@ $formattedDate
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Dijumpai ${detected.length} Rekod Baru', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        content: SizedBox(width: double.maxFinite, child: ListView.builder(shrinkWrap: true, itemCount: detected.length, itemBuilder: (context, i) => ListTile(title: Text(detected[i].name, style: GoogleFonts.poppins()), subtitle: Text(DateFormat('dd/MM/yyyy').format(detected[i].date), style: GoogleFonts.poppins())))),
+        title: Text('Dijumpai ${detected.length} Rekod Baru', style: GoogleFonts.montserrat(fontWeight: FontWeight.bold)),
+        content: SizedBox(width: double.maxFinite, child: ListView.builder(shrinkWrap: true, itemCount: detected.length, itemBuilder: (context, i) => ListTile(title: Text(detected[i].name), subtitle: Text(DateFormat('dd/MM/yyyy').format(detected[i].date))))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Batal', style: GoogleFonts.poppins())), 
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')), 
           ElevatedButton(onPressed: () { 
             for (var b in detected) { 
               _db.add(b.toJson()); 
               _scheduleSmartNotification(b);
             } 
             Navigator.pop(context); 
-          }, child: Text('Tambah Semua', style: GoogleFonts.poppins()))
+          }, child: const Text('Tambah Semua'))
         ],
       ),
     );
@@ -291,12 +291,12 @@ $formattedDate
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Sahkan Padam', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        title: Text('Sahkan Padam', style: GoogleFonts.montserrat(fontWeight: FontWeight.bold)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Masukkan kata laluan untuk memadam rekod:', textAlign: TextAlign.center, style: GoogleFonts.poppins()),
+            const Text('Masukkan kata laluan untuk memadam rekod:', textAlign: TextAlign.center),
             const SizedBox(height: 15),
             TextField(
               controller: passwordController,
@@ -305,14 +305,13 @@ $formattedDate
               decoration: InputDecoration(
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), 
                 labelText: 'Kata Laluan',
-                labelStyle: GoogleFonts.poppins(),
                 prefixIcon: const Icon(Icons.lock_outline),
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Batal', style: GoogleFonts.poppins())),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () {
@@ -324,7 +323,7 @@ $formattedDate
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Kata laluan salah!"), backgroundColor: Colors.red));
               }
             },
-            child: Text('Padam', style: GoogleFonts.poppins()),
+            child: const Text('Padam'),
           ),
         ],
       ),
@@ -370,7 +369,7 @@ $formattedDate
                 children: [
                   Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)), margin: const EdgeInsets.symmetric(vertical: 10)),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Expanded(child: Text(isBirthday ? 'Tambah Hari Jadi' : 'Tambah Tugasan', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                    Expanded(child: Text(isBirthday ? 'Tambah Hari Jadi' : 'Tambah Tugasan', style: GoogleFonts.montserrat(fontSize: 20, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
                     IconButton(
                       icon: Icon(Icons.document_scanner, color: kIsWeb ? Colors.grey : Colors.blueAccent), 
                       onPressed: () { if (!kIsWeb) { Navigator.pop(context); _scanBulkImage(); } }
@@ -378,17 +377,15 @@ $formattedDate
                   ]),
                   const SizedBox(height: 15),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    FilterChip(label: Text("🎂 Hari Jadi", style: GoogleFonts.poppins()), selected: isBirthday, onSelected: (s) => setModalState(() => isBirthday = true)),
+                    FilterChip(label: const Text("🎂 Hari Jadi"), selected: isBirthday, onSelected: (s) => setModalState(() => isBirthday = true)),
                     const SizedBox(width: 10),
-                    FilterChip(label: Text("🚀 Tugasan", style: GoogleFonts.poppins()), selected: !isBirthday, onSelected: (s) => setModalState(() => isBirthday = false)),
+                    FilterChip(label: const Text("🚀 Tugasan"), selected: !isBirthday, onSelected: (s) => setModalState(() => isBirthday = false)),
                   ]),
                   const SizedBox(height: 10),
                   TextField(
                     controller: nameController, 
-                    style: GoogleFonts.poppins(),
                     decoration: InputDecoration(
                       labelText: isBirthday ? 'Nama Penuh' : 'Tajuk Tugasan',
-                      labelStyle: GoogleFonts.poppins(),
                       prefixIcon: Icon(isBirthday ? Icons.person_outline : Icons.task_outlined),
                       suffixIcon: IconButton(icon: Icon(isListening ? Icons.mic : Icons.mic_none, color: Colors.pink), onPressed: toggleListen),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
@@ -398,10 +395,8 @@ $formattedDate
                   TextField(
                     controller: phoneController, 
                     keyboardType: TextInputType.phone,
-                    style: GoogleFonts.poppins(),
                     decoration: InputDecoration(
                       labelText: 'WhatsApp (Opsyenal)',
-                      labelStyle: GoogleFonts.poppins(),
                       prefixIcon: const Icon(Icons.phone_outlined),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
                     )
@@ -411,8 +406,8 @@ $formattedDate
                     decoration: BoxDecoration(color: Colors.pink[50], borderRadius: BorderRadius.circular(15)),
                     child: Row(children: [
                       Expanded(child: ListTile(
-                        title: Text(DateFormat('dd MMM yyyy').format(selectedDate), style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis), 
-                        subtitle: Text("Tarikh", style: GoogleFonts.poppins(fontSize: 11)),
+                        title: Text(DateFormat('dd MMM yyyy').format(selectedDate), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis), 
+                        subtitle: const Text("Tarikh", style: TextStyle(fontSize: 11)),
                         leading: const Icon(Icons.calendar_month, color: Colors.pinkAccent, size: 20), 
                         onTap: () async {
                           final p = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(1900), lastDate: DateTime(2100));
@@ -420,8 +415,8 @@ $formattedDate
                         }
                       )),
                       if (!isBirthday) Expanded(child: ListTile(
-                        title: Text(selectedTime.format(context), style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis), 
-                        subtitle: Text("Masa", style: GoogleFonts.poppins(fontSize: 11)),
+                        title: Text(selectedTime.format(context), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis), 
+                        subtitle: const Text("Masa", style: TextStyle(fontSize: 11)),
                         leading: const Icon(Icons.access_time, color: Colors.pinkAccent, size: 20), 
                         onTap: () async {
                           final t = await showTimePicker(context: context, initialTime: selectedTime);
@@ -445,7 +440,7 @@ $formattedDate
                           Navigator.pop(context);
                         }
                       }, 
-                      child: Text('Simpan Rekod', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold))
+                      child: const Text('Simpan Rekod', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
                     ),
                   ),
                   const SizedBox(height: 20)
@@ -460,24 +455,30 @@ $formattedDate
 
   @override
   Widget build(BuildContext context) {
+    double width = MediaQuery.of(context).size.width;
+    int crossAxisCount = width > 1200 ? 3 : (width > 800 ? 2 : 1);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFF0F2F5),
       body: CustomScrollView(
         slivers: [
           SliverAppBar.large(
-            expandedHeight: 180,
+            expandedHeight: 200,
             pinned: true,
             backgroundColor: Colors.pinkAccent,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(_selectedIndex == 0 ? 'Hari Jadi' : 'Tugasan Pintar', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: Text(
+                _selectedIndex == 0 ? 'Hari Jadi' : 'Tugasan Pintar', 
+                style: GoogleFonts.montserrat(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 1.2)
+              ),
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Colors.pinkAccent, Colors.orangeAccent]),
                 ),
                 child: Stack(
                   children: [
-                    Positioned(right: -20, bottom: -20, child: Icon(Icons.cake, size: 150, color: Colors.white.withOpacity(0.1))),
-                    Positioned(left: 20, top: 50, child: Icon(Icons.celebration, size: 80, color: Colors.white.withOpacity(0.1))),
+                    Positioned(right: -30, bottom: -30, child: Icon(Icons.cake, size: 180, color: Colors.white.withOpacity(0.12))),
+                    Positioned(left: 30, top: 60, child: Icon(Icons.celebration, size: 100, color: Colors.white.withOpacity(0.12))),
                   ],
                 ),
               ),
@@ -487,34 +488,33 @@ $formattedDate
             ],
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: TextField(
-                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-                style: GoogleFonts.poppins(),
-                decoration: InputDecoration(
-                  hintText: 'Cari ${_selectedIndex == 0 ? "nama" : "tugasan"}...',
-                  hintStyle: GoogleFonts.poppins(),
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 800),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+                child: TextField(
+                  onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                  decoration: InputDecoration(
+                    hintText: 'Cari ${_selectedIndex == 0 ? "nama" : "tugasan"}...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
                 ),
               ),
             ),
           ),
-          _buildListStream(),
+          _buildListStream(crossAxisCount),
         ],
       ),
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+        decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15)]),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: (index) => setState(() { _selectedIndex = index; _searchQuery = ""; }),
           selectedItemColor: Colors.pinkAccent,
-          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-          unselectedLabelStyle: GoogleFonts.poppins(),
           backgroundColor: Colors.white,
           elevation: 0,
           type: BottomNavigationBarType.fixed,
@@ -529,17 +529,17 @@ $formattedDate
         backgroundColor: Colors.pinkAccent,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
-        label: Text("Tambah", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        label: const Text("Tambah"),
       ),
     );
   }
 
-  Widget _buildListStream() {
+  Widget _buildListStream(int crossAxisCount) {
     return StreamBuilder<QuerySnapshot>(
       stream: _db.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return SliverFillRemaining(child: Center(child: Text('Tiada rekod dijumpai.', style: GoogleFonts.poppins())));
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SliverFillRemaining(child: Center(child: Text('Tiada rekod dijumpai.')));
         
         bool isBirthdayTab = _selectedIndex == 0;
         List<Birthday> allItems = snapshot.data!.docs.map((doc) => Birthday.fromFirestore(doc)).toList();
@@ -555,114 +555,131 @@ $formattedDate
           items.sort((a, b) => a.date.compareTo(b.date));
         }
 
-        if (items.isEmpty) return SliverFillRemaining(child: Center(child: Text('Carian tidak dijumpai.', style: GoogleFonts.poppins())));
+        if (items.isEmpty) return const SliverFillRemaining(child: Center(child: Text('Carian tidak dijumpai.')));
 
-        return SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final b = items[index];
-              final daysLeft = isBirthdayTab ? _daysUntilNextBirthday(b.date) : b.date.difference(DateTime.now()).inDays;
-              
-              bool isToday = isBirthdayTab && daysLeft == 0;
-              bool isThisWeek = isBirthdayTab && daysLeft > 0 && daysLeft <= 7;
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisExtent: 140, // Tetapkan tinggi kad
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final b = items[index];
+                final daysLeft = isBirthdayTab ? _daysUntilNextBirthday(b.date) : b.date.difference(DateTime.now()).inDays;
+                
+                bool isToday = isBirthdayTab && daysLeft == 0;
+                bool isThisWeek = isBirthdayTab && daysLeft > 0 && daysLeft <= 7;
 
-              int age = DateTime.now().year - b.date.year;
-              if (DateTime.now().month < b.date.month || (DateTime.now().month == b.date.month && DateTime.now().day < b.date.day)) age--;
+                int age = DateTime.now().year - b.date.year;
+                if (DateTime.now().month < b.date.month || (DateTime.now().month == b.date.month && DateTime.now().day < b.date.day)) age--;
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isToday ? const Color(0xFFFFEBF2) : (isThisWeek ? const Color(0xFFFFF7E6) : Colors.white),
-                    borderRadius: BorderRadius.circular(20),
-                    border: isToday ? Border.all(color: Colors.pinkAccent, width: 2) : (isThisWeek ? Border.all(color: Colors.orangeAccent, width: 1.5) : null),
-                    boxShadow: [BoxShadow(color: isToday ? Colors.pink.withOpacity(0.15) : Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 5))],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Column(
-                      children: [
-                        if (isToday) Container(
-                          width: double.infinity, 
-                          padding: const EdgeInsets.symmetric(vertical: 6), 
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(colors: [Colors.pinkAccent, Color(0xFFFF4081)]),
-                          ),
-                          child: Text("🎂 HARI INI - SANNAH HELWAH!", textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5))
-                        ),
-                        if (isThisWeek && !isToday) Container(
-                          width: double.infinity, 
-                          padding: const EdgeInsets.symmetric(vertical: 6), 
-                          color: Colors.orangeAccent, 
-                          child: Text("🌟 MINGGU INI", textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5))
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          child: Row(
-                            children: [
-                              Stack(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 28,
-                                    backgroundColor: isToday ? Colors.pinkAccent : (isThisWeek ? Colors.orange[200] : Colors.grey[200]),
-                                    child: Text(b.name.isNotEmpty ? b.name[0].toUpperCase() : "?", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 22, color: isToday ? Colors.white : (isThisWeek ? Colors.orange[900] : Colors.grey[800]))),
-                                  ),
-                                  if (isToday) const Positioned(right: 0, bottom: 0, child: Icon(Icons.stars, color: Colors.orangeAccent, size: 22)),
-                                ],
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(b.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 17, color: isToday ? const Color(0xFF880E4F) : Colors.black87), overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.event_note, size: 14, color: isToday ? Colors.pinkAccent : Colors.grey[600]),
-                                        const SizedBox(width: 4),
-                                        Expanded(child: Text(isBirthdayTab ? DateFormat('dd MMMM').format(b.date) : DateFormat('dd MMM yyyy • HH:mm').format(b.date), style: GoogleFonts.poppins(color: Colors.grey[800], fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis)),
-                                      ],
-                                    ),
-                                    if (isBirthdayTab) Padding(
-                                      padding: const EdgeInsets.only(top: 4.0),
-                                      child: Text("Menjelang Umur $age • $daysLeft Hari Lagi", style: GoogleFonts.poppins(color: isToday ? Colors.pinkAccent : (isThisWeek ? Colors.orange[900] : Colors.grey[600]), fontSize: 12, fontWeight: (isToday || isThisWeek) ? FontWeight.bold : FontWeight.normal)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _actionButton(
-                                    icon: Icons.copy_rounded, 
-                                    color: Colors.blue, 
-                                    bgColor: Colors.blue[50]!, 
-                                    onTap: () { copyGreetingStatic(b); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ucapan disalin!"), behavior: SnackBarBehavior.floating)); }
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _actionButton(
-                                    icon: Icons.delete_sweep_rounded, 
-                                    color: Colors.red, 
-                                    bgColor: Colors.red[50]!, 
-                                    onTap: () => _confirmDelete(b)
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-            childCount: items.length,
+                return _buildBirthdayCard(b, isToday, isThisWeek, isBirthdayTab, age, daysLeft);
+              },
+              childCount: items.length,
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildBirthdayCard(Birthday b, bool isToday, bool isThisWeek, bool isBirthdayTab, int age, int daysLeft) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: isToday ? const Color(0xFFFFEBF2) : (isThisWeek ? const Color(0xFFFFF7E6) : Colors.white),
+          borderRadius: BorderRadius.circular(24),
+          border: isToday ? Border.all(color: Colors.pinkAccent, width: 2.5) : (isThisWeek ? Border.all(color: Colors.orangeAccent, width: 1.5) : null),
+          boxShadow: [
+            BoxShadow(
+              color: isToday ? Colors.pink.withOpacity(0.2) : Colors.black.withOpacity(0.04), 
+              blurRadius: 15, 
+              offset: const Offset(0, 6)
+            )
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              if (isToday) Positioned(right: -10, top: -10, child: Icon(Icons.stars, size: 60, color: Colors.pinkAccent.withOpacity(0.1))),
+              Column(
+                children: [
+                  if (isToday) Container(
+                    width: double.infinity, 
+                    padding: const EdgeInsets.symmetric(vertical: 6), 
+                    decoration: const BoxDecoration(gradient: LinearGradient(colors: [Colors.pinkAccent, Color(0xFFFF4081)])),
+                    child: Text("🎂 HARI INI - SANNAH HELWAH!", textAlign: TextAlign.center, style: GoogleFonts.montserrat(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2))
+                  ),
+                  if (isThisWeek && !isToday) Container(
+                    width: double.infinity, 
+                    padding: const EdgeInsets.symmetric(vertical: 6), 
+                    color: Colors.orangeAccent, 
+                    child: Text("🌟 MINGGU INI", textAlign: TextAlign.center, style: GoogleFonts.montserrat(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2))
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 30,
+                            backgroundColor: isToday ? Colors.pinkAccent : (isThisWeek ? Colors.orange[200] : Colors.grey[200]),
+                            child: Text(b.name.isNotEmpty ? b.name[0].toUpperCase() : "?", style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, fontSize: 24, color: isToday ? Colors.white : (isThisWeek ? Colors.orange[900] : Colors.grey[800]))),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(b.name, style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, fontSize: 16, color: isToday ? const Color(0xFF880E4F) : Colors.black87), overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Icon(Icons.event, size: 14, color: isToday ? Colors.pinkAccent : Colors.grey[600]),
+                                    const SizedBox(width: 6),
+                                    Text(isBirthdayTab ? DateFormat('dd MMM').format(b.date) : DateFormat('dd MMM yyyy').format(b.date), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                  ],
+                                ),
+                                if (isBirthdayTab) Text("Umur $age • $daysLeft Hari Lagi", style: TextStyle(color: isToday ? Colors.pinkAccent : (isThisWeek ? Colors.orange[900] : Colors.grey[600]), fontSize: 12, fontWeight: (isToday || isThisWeek) ? FontWeight.bold : FontWeight.normal)),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _actionButton(
+                                icon: Icons.copy_rounded, 
+                                color: Colors.blue, 
+                                bgColor: Colors.blue[50]!, 
+                                onTap: () { copyGreetingStatic(b); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ucapan disalin!"), behavior: SnackBarBehavior.floating)); }
+                              ),
+                              const SizedBox(height: 8),
+                              _actionButton(
+                                icon: Icons.delete_outline_rounded, 
+                                color: Colors.red, 
+                                bgColor: Colors.red[50]!, 
+                                onTap: () => _confirmDelete(b)
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
