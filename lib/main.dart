@@ -456,6 +456,7 @@ $formattedDate
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
+    // Tentukan bilangan lajur berdasarkan lebar skrin
     int crossAxisCount = width > 1200 ? 3 : (width > 800 ? 2 : 1);
 
     return Scaffold(
@@ -490,17 +491,23 @@ $formattedDate
           SliverToBoxAdapter(
             child: Center(
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 800),
+                constraints: const BoxConstraints(maxWidth: 800), // Hadkan lebar bar carian di web
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-                child: TextField(
-                  onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-                  decoration: InputDecoration(
-                    hintText: 'Cari ${_selectedIndex == 0 ? "nama" : "tugasan"}...',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: TextField(
+                    onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                    decoration: InputDecoration(
+                      hintText: 'Cari ${_selectedIndex == 0 ? "nama" : "tugasan"}...',
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.transparent, // Gunakan hiasan Container di atas
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                    ),
                   ),
                 ),
               ),
@@ -557,12 +564,13 @@ $formattedDate
 
         if (items.isEmpty) return const SliverFillRemaining(child: Center(child: Text('Carian tidak dijumpai.')));
 
+        // Gunakan SliverGrid untuk paparan yang lebih menarik di Web
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           sliver: SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              mainAxisExtent: 140, // Tetapkan tinggi kad
+              mainAxisExtent: 140, // Hadkan tinggi kad
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
             ),
