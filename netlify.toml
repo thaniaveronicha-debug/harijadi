@@ -1,7 +1,9 @@
 [build]
   publish = "build/web"
-  command = "git clone https://github.com/flutter/flutter.git --depth 1 -b stable $FLUTTER_HOME && $FLUTTER_HOME/bin/flutter build web --release"
+  command = "git clone https://github.com/flutter/flutter.git --depth 1 -b stable /tmp/flutter && export PATH=$PATH:/tmp/flutter/bin && flutter config --enable-web && flutter build web --release"
 
 [build.environment]
-  FLUTTER_HOME = "/opt/build/cache/flutter"
-  PATH = "/opt/build/cache/flutter/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  # Memaksa Netlify mengabaikan pemasangan Ruby/Bundler
+  NETLIFY_SKIP_RUBY_INSTALL = "1"
+  # Menetapkan versi Node yang stabil
+  NODE_VERSION = "20"
